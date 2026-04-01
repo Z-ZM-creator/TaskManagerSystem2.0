@@ -10,8 +10,8 @@ public class Main {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         Service service = new Service();
+        service.LoadUserMap("userList.txt");
         while (true) {
-            service.LoadUserMap("userList.txt");
             System.out.println("Welcome use Task Manager System(2.0)");
             System.out.println("1.Sign up");
             System.out.println("2.Sign in");
@@ -47,6 +47,7 @@ public class Main {
             SignUpResult.SignUpStatus status = result.getStatus();
             if (status == SignUpResult.SignUpStatus.SUCCESS) {
                 System.out.println("Sign up successfully!");
+                System.out.println("Your UserID is: " + result.getUser().getUserID());
                 System.out.println("Your UserName is: " + result.getUser().getUserName() + ", Your Password is: " + result.getUser().getUserPassword());
                 break;
             }

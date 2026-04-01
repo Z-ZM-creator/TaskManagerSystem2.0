@@ -1,5 +1,7 @@
 package com.zzm;
 
+import jdk.jshell.Snippet;
+
 public class TaskModel {
     public enum TaskStatus{
         TO_DO,
@@ -17,10 +19,17 @@ public class TaskModel {
     private String TaskID;
     private String TaskName;
     private TaskStatus status;
+    //这个构造方法只用于新建任务时，ID自动分配，默认状态
     public TaskModel(String taskName){
-        this.TaskID=String.format("%10d",nextId++);
+        this.TaskID=String.format("%010d",nextId++);
         this.TaskName=taskName;
         this.status=TaskStatus.TO_DO;
+    }
+    //这个二元素的构造方法用于文件载入时读取原有ID。
+    public TaskModel(String taskID,String taskName,TaskStatus status){
+        this.TaskID=taskID;
+        this.TaskName=taskName;
+        this.status=status;
     }
     public String getTaskID(){
         return TaskID;
@@ -33,6 +42,9 @@ public class TaskModel {
         }
     public TaskStatus getStatus(){
         return status;
+    }
+    public static void setNextId(long id){
+        nextId=id;
     }
     @Override
     public String toString(){

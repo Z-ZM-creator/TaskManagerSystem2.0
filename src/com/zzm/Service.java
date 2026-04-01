@@ -12,25 +12,28 @@ public class Service {
     private HashMap<String,TaskModel> currentTaskMap;
     private UserModel currentUser;
     //SaveUsersMap用于存储用户列表
+    //if结构错误，判断文件不存在后创建，跳出if判断后再进行文件写入
+    //文件名前后不一致，保存文件为User List.txt，加载文件为UserList.txt
     public void SaveUserMap() {
         try {
-            File file = new File("User List.txt");
+            File file = new File("userList.txt");
             if (!file.exists()) {
                 file.createNewFile();
-                BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-                for (String key : userMap.keySet()) {
-                    String line = key + "-" + userMap.get(key).getUserName() + "-" + userMap.get(key).getUserPassword();
-                    writer.write(line);
-                    writer.newLine();
-                }
-                writer.close();
             }
+            BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+            for (String key : userMap.keySet()) {
+                String line = key + "-" + userMap.get(key).getUserName() + "-" + userMap.get(key).getUserPassword();
+                writer.write(line);
+                writer.newLine();
+            }
+            writer.close();
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
     //LoadUsersMap用于加载用户列表
+    //line.length()!=3的问题在哪
     public void LoadUserMap(String FilePath){
         try {
             File file = new File(FilePath);
@@ -40,19 +43,26 @@ public class Service {
             }
             BufferedReader reader = new BufferedReader(new FileReader(file));
             String line;
+            long maxid=-1;
             while ((line = reader.readLine()) != null) {
                 if (line.trim().isEmpty()) {
                     continue;
                 }
                 String[] lines = line.split("-");
-                if (line.length() != 3) {
+                if (lines.length != 3) {
                     continue;
                 }
                 String userID = lines[0];
                 String userName = lines[1];
                 String password = lines[2];
-                userMap.put(userID, new UserModel(userName, password));
+                //使用新构造方法，读取文件时使用原有ID，避免ID丢失
+                userMap.put(userID, new UserModel(userID,userName, password));
+                long idNum=Long.parseLong(String.valueOf(userID));
+                if(idNum>maxid){
+                    maxid=idNum;
+                }
             }
+            UserModel.setNextId(maxid+1);
             reader.close();
         }catch(IOException e){
             e.printStackTrace();
@@ -65,6 +75,10 @@ public class Service {
             UserModel user = userMap.get(UserId);
             HashMap<String, TaskModel> taskMap = user.getTaskMap();
             String filePath = "User_" + UserId + "_TaskList.txt";
+           File file=new File(filePath);
+           if(!file.exists()){
+               file.createNewFile();
+           }
             BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
             for (String key : taskMap.keySet()) {
                 TaskModel task = taskMap.get(key);
@@ -79,12 +93,14 @@ public class Service {
     }
 
     //LoadTaskMap方法用于加载任务列表
+    //ID计数器丢失，每次重载后计数器从0开始，更改查找max，获得最大值。
     public void LoadTaskMap(String UserId){
         try {
             UserModel user = userMap.get(UserId);
             String filePath = "User_" + UserId + "_TaskList.txt";
             BufferedReader reader = new BufferedReader(new FileReader(filePath));
             String line;
+                long maxid=-1;
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split("-");
                 if (parts.length != 3) {
@@ -93,8 +109,13 @@ public class Service {
                 String TaskId = parts[0];
                 String taskName = parts[1];
                 TaskModel.TaskStatus status = TaskModel.TaskStatus.valueOf(parts[2]);
-                TaskModel task = new TaskModel(taskName);
+                //ID加载时丢失原有ID ，
+                TaskModel task = new TaskModel(TaskId, taskName, status);
                 user.getTaskMap().put(TaskId, task);
+                if(Long.parseLong(TaskId)>maxid){
+                    maxid=Long.parseLong(TaskId);
+                }
+                TaskModel.setNextId(maxid+1);
             }
             reader.close();
         }catch(IOException e){
@@ -103,30 +124,33 @@ public class Service {
     }
 
     //SignUp方法用于注册用户，接收用户名和密码，并返回注册结果。
-
+    //SignUp没有调用saveUserMap方法
+    //SignUp没有调用saveTaskMap方法,导致下一次登录后无法显示任务
     public SignUpResult SignUp(String UserName,String Password){
         SignUpResult signUpResult;
         if(UserName==null||Password==null){
             return signUpResult=new SignUpResult (SignUpResult.SignUpStatus.ILLEGAL_ARGUMENT,null);
         }else{
             UserModel user=new UserModel(UserName,Password);
-            userMap.put(user.getUserName(), user);
-            SaveTaskMap(user.getUserName());
+                userMap.put(user.getUserID(), user);
+            SaveUserMap();
+            SaveTaskMap(user.getUserID());
             return signUpResult=new SignUpResult(SignUpResult.SignUpStatus.SUCCESS,user);
             }
     }
-
+//SignIn方法用于登录用户，接收用户名和密码，并返回登录结果。
+    //password比较方式错误，比较引用和内容比较不同，应该使用!userMap.get(UserID).getUserPassword().equals(Password)
     public SignInResult SignIn(String UserID,String Password){
         SignInResult signInResult;
         if(!userMap.containsKey(UserID)){
             return signInResult=new SignInResult(SignInResult.SignInStatus.ID_NOT_FOUND,null);
-        }else if(userMap.get(UserID).getUserPassword()!=Password){
+        }else if(!userMap.get(UserID).getUserPassword().equals(Password)){
             return signInResult=new SignInResult(SignInResult.SignInStatus.PASSWORD_ERROR,null);
         }else{
             UserModel user=userMap.get(UserID);
             currentTaskMap=user.getTaskMap();
             currentUser=user;
-            LoadTaskMap(user.getUserName());
+            LoadTaskMap(user.getUserID());
             return signInResult=new SignInResult(SignInResult.SignInStatus.SUCCESS,user);
         }
     }
@@ -182,7 +206,7 @@ public class Service {
         }
         TaskModel task=new TaskModel(taskName);
         currentTaskMap.put(task.getTaskID(), task);
-        SaveTaskMap(currentUser.getUserName());
+        SaveTaskMap(currentUser.getUserID());
         return createTaskResult=new CreateTaskResult(CreateTaskResult.CreateTaskResultEnum.SUCCESS,task);
     }
 
@@ -215,7 +239,7 @@ public class Service {
             return startTaskResult=new StartTaskResult(StartTaskResult.StartTsakStatus.TASK_ALREADY_COMPLETED, currentTaskMap.get(taskID));
         }
         currentTaskMap.get(taskID).setStatus(TaskModel.TaskStatus.IN_PROGRESS);
-        SaveTaskMap(currentUser.getUserName());
+        SaveTaskMap(currentUser.getUserID());
         return startTaskResult=new StartTaskResult(StartTaskResult.StartTsakStatus.SUCCESS, currentTaskMap.get(taskID));
     }
 
@@ -232,7 +256,7 @@ public class Service {
             return completeTaskResult=new CompleteTaskResult(CompleteTaskResult.CompleteTaskStatus.TASK_ALREADY_COMPLETED, currentTaskMap.get(taskID));
         }
         currentTaskMap.get(taskID).setStatus(TaskModel.TaskStatus.DONE);
-        SaveTaskMap(currentUser.getUserName());
+        SaveTaskMap(currentUser.getUserID());
         return completeTaskResult=new CompleteTaskResult(CompleteTaskResult.CompleteTaskStatus.SUCCESS, currentTaskMap.get(taskID));
     }
 
@@ -246,7 +270,7 @@ public class Service {
         }
         TaskModel task=currentTaskMap.get(taskID);
         currentTaskMap.remove(taskID);
-        SaveTaskMap(currentUser.getUserName());
+        SaveTaskMap(currentUser.getUserID());
         return deleteTaskResult=new DeleteTaskResult(DeleteTaskResult.deleteTaskStatus.SUCCESS, task);
     }
 }
